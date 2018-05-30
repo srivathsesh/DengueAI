@@ -1,0 +1,138 @@
+---
+title: "Final"
+author: "Sri Seshadri"
+date: "5/20/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+library(magrittr)
+library(tidyverse)
+library(skimr)
+library(forecast)
+library(lubridate)
+library(xts)
+library(astsa)
+library(caret)
+```
+
+#1. Introduction
+
+
+#2. Executive Summary
+
+#3. About the data
+
+```{r, warning = F}
+train <- read_csv("Training.csv")
+test <- read_csv("DengAI_Predicting_Disease_Spread_-_Test_Data_Features.csv")
+
+skim_with(numeric= list(hist= NULL),integer = list(hist = NULL))
+pander::pander(skim(train))
+# Show missing values 
+```
+
+```{r, fig.cap="Missing data map"}
+Amelia::missmap(train,y.cex = 0.5,x.cex = 0.5)
+```
+
+# 4. Data Preparation
+
+Split the data into the 2 regions - based on a paper that different regions had different Dengue reports based on localized conditions.
+Impute data based on kNN method - chicken or the egg problem... impute data before feature selection or feature selection before imputing?
+Verification of data imputing covered in the next section.
+
+```{r}
+
+# Split data by city
+
+trainSJ <- train %>% dplyr::filter(city == "sj")
+trainIQ <- train %>% dplyr::filter(city == "iq")
+
+trainImputedSj <- VIM::kNN(trainSJ[, -5])
+trainImputedIq <- VIM::kNN(trainIQ[, -5])
+
+trainImputedSj %<>% mutate(week_start_date = lubridate::mdy(week_start_date),
+                           total_cases = trainSJ$total_cases)
+trainImputedIq %<>% mutate(week_start_date = lubridate::mdy(week_start_date),
+                           total_cases = trainIQ$total_cases)
+
+```
+
+# 5. Exploratory Data Analysis (EDA)
+
+Reported cases - non stationary, seasonal series
+```{r}
+par(mfrow = c(2,1))
+tsplot(trainImputedSj$total_cases~trainImputedSj$week_start_date, main = "Dengue reported cases in San Juan", ylab = "Total cases")
+tsplot(trainImputedIq$total_cases~trainImputedIq$week_start_date, main = "Dengue reported cases in Iquitos", ylab = "Total cases")
+```
+
+## verify imputation
+
+```{r}
+plot(trainImputedSj$ndvi_ne~trainImputedSj$week_start_date, col = ifelse(trainImputedSj$ndvi_ne_imp == T,"red", "black"),type = "b")
+plot(trainImputedIq$ndvi_ne~trainImputedIq$week_start_date, col = ifelse(trainImputedIq$ndvi_ne_imp == T,"red", "black"), type = "b")
+
+plot(trainImputedSj$ndvi_nw~trainImputedSj$week_start_date, col = ifelse(trainImputedSj$ndvi_nw_imp == T,"red", "black"),type = "b")
+plot(trainImputedIq$ndvi_nw~trainImputedIq$week_start_date, col = ifelse(trainImputedIq$ndvi_nw_imp == T,"red", "black"), type = "b")
+
+plot(trainImputedSj$station_avg_temp_c~trainImputedSj$week_start_date, col = ifelse(trainImputedSj$station_avg_temp_c_imp == T,"red", "black"),type = "b")
+plot(trainImputedIq$station_avg_temp_c~trainImputedIq$week_start_date, col = ifelse(trainImputedIq$station_avg_temp_c_imp == T,"red", "black"),type = "b",lty = 1,lwd = 0.5, cex = 0.5)
+
+```
+
+
+## 
+
+```{r}
+cormatSj <-  trainImputedSj %>% 
+  select_if(is.numeric) %>% 
+  cor(.)
+
+corrplot::corrplot(cormatSj,method = 'ellipse',tl.cex = 0.6,order = "hclust")
+findCorrelation(cormatSj, names = T)
+
+cormatIq <- trainImputedIq %>% 
+  select_if(is.numeric) %>% cor(.)
+
+corrplot::corrplot(cormatIq, method = 'ellipse',tl.cex = 0.6, order = 'hclust')
+
+findCorrelation(cormatIq, names = T)
+
+```
+
+
+# 6. Feature Selection
+
+1. Recursive feature elimination 
+
+```{r}
+ccf2(trainImputedSj$total_cases,trainImputedSj$reanalysis_specific_humidity_g_per_kg,max.lag = 15)
+```
+
+```{r}
+findCorrelation(cormat,names = T)
+#train <- train %>% mutate(index = 1:nrow(.))
+trainImputed %<>% mutate(city = as.factor(city),
+                  week_start_date = mdy(week_start_date)
+)
+newRF <- rfFuncs
+varSeq <- seq(1,22,by = 2)
+ctrl <- rfeControl(method = "repeatedcv",
+                   repeats = 5,
+                   verbose = T,
+                   functions = rfFuncs,
+                   allowParallel = T)
+rfRFE <- rfe(x = trainImputed[,c(-2:-6,-27:-52)],
+             y = trainImputed$total_cases,
+             sizes = varSeq,
+             metric = "RMSE",
+             rfeControl = ctrl,
+             ntree = 1000)
+
+
+
+```
+

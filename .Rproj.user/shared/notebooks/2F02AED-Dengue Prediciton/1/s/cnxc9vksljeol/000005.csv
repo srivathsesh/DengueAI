@@ -1,0 +1,2 @@
+"0","par(mfrow = c(2,1))"
+"0","tsplot(trainImputedSj$total_cases~trainImputedSj$week_start_date, main = ""Dengue reported cases in San Juan"", ylab = ""Total cases"")"
