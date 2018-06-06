@@ -15,6 +15,7 @@ library(lubridate)
 library(xts)
 library(astsa)
 library(caret)
+library(dplyr)
 ```
 
 #1. Introduction
@@ -63,6 +64,7 @@ trainImputedIq %<>% mutate(week_start_date = lubridate::mdy(week_start_date),
 # 5. Exploratory Data Analysis (EDA)
 
 Reported cases - non stationary, seasonal series
+
 ```{r}
 par(mfrow = c(2,1))
 tsplot(trainImputedSj$total_cases~trainImputedSj$week_start_date, main = "Dengue reported cases in San Juan", ylab = "Total cases")
@@ -92,47 +94,127 @@ cormatSj <-  trainImputedSj %>%
   cor(.)
 
 corrplot::corrplot(cormatSj,method = 'ellipse',tl.cex = 0.6,order = "hclust")
-findCorrelation(cormatSj, names = T)
+
 
 cormatIq <- trainImputedIq %>% 
   select_if(is.numeric) %>% cor(.)
 
 corrplot::corrplot(cormatIq, method = 'ellipse',tl.cex = 0.6, order = 'hclust')
 
-findCorrelation(cormatIq, names = T)
+HighCorIq <- findCorrelation(cormatIq, names = T)
+HighCorSj <- findCorrelation(cormatSj, names = T)
+
+```
+
+```{r}
+tsTotalcasesSj <- ts(trainImputedSj$total_cases, start = c(1990,18), frequency = 52)
+ggseasonplot(tsTotalcasesSj)  
+
+
+
+ggseasonplot(ts(trainImputedSj$reanalysis_relative_humidity_percent,start = c(1990,18), frequency = 52)) + theme_classic() +theme(legend.position = "none",plot.title = element_text(hjust = 0.5),axis.text.x = element_text(size = 5)) + ggtitle("Reanalysis_relative_humidity_%")
+
+ggseasonplot(ts(trainImputedSj$reanalysis_max_air_temp_k, start = c(1990,18), frequency = 52)) +  theme_classic() + theme(legend.position = "none",plot.title = element_text(hjust = 0.5),axis.text.x = element_text(size = 5)) + ggtitle("Reanalysis_max_air_temp_K")
 
 ```
 
 
 # 6. Feature Selection
-
+ 
 1. Recursive feature elimination 
 
 ```{r}
-ccf2(trainImputedSj$total_cases,trainImputedSj$reanalysis_specific_humidity_g_per_kg,max.lag = 15)
+# Remove highCor variables
+trainImputedSj %<>% 
+  select(-city,-Year.Week) %>%  
+  select(-one_of(!!HighCorSj)) %>% 
+  select(-ends_with("imp"))
+
+# make data a time series object
+tsTrainImputedSj <-  xts::xts(trainImputedSj[,-1:-3],order.by = trainImputedSj$week_start_date, frequency = 52)
+
+#ccf2(trainImputedSj$total_cases,trainImputedSj$reanalysis_specific_humidity_g_per_kg,max.lag = 15)
 ```
 
+## Random forest
+
 ```{r}
-findCorrelation(cormat,names = T)
-#train <- train %>% mutate(index = 1:nrow(.))
-trainImputed %<>% mutate(city = as.factor(city),
-                  week_start_date = mdy(week_start_date)
-)
+
+# Fearure selection by removing time as a variable.
+
 newRF <- rfFuncs
-varSeq <- seq(1,22,by = 2)
+varSeq <- seq(1,15,by = 2)
 ctrl <- rfeControl(method = "repeatedcv",
                    repeats = 5,
-                   verbose = T,
+                   verbose = F,
                    functions = rfFuncs,
                    allowParallel = T)
-rfRFE <- rfe(x = trainImputed[,c(-2:-6,-27:-52)],
-             y = trainImputed$total_cases,
+rfRFE <- rfe(x = trainImputedSj[,c(-1:-3,-19)],
+             y = trainImputedSj$total_cases,
              sizes = varSeq,
              metric = "RMSE",
              rfeControl = ctrl,
-             ntree = 1000)
+             ntree = 500)
+             #ntree = 1000)
 
 
+predictors(rfRFE)
+```
+
+### random forest after removing the effect of time
+
+```{r}
+# remove 1996 data for feature selection
+auto.arima(tsTrainImputedSj$total_cases)
+auto.arima(trainImputedSj$total_cases[trainImputedSj$year >= 1996],stepwise = F)
+astsa::acf2(trainImputedSj$total_cases[trainImputedSj$year >= 1996])
+fit <- astsa::sarima(trainImputedSj$total_cases[trainImputedSj$year >= 1996],p = 1,d = 1, q = 1)
+Box.test(fit$fit$residuals)
+auto.arima(trainImputedSj$total_cases[trainImputedSj$year >= 1996],stepwise = F)
+
+```
+
+```{r}
+rfRFE_timeEffect <- rfe(x = trainImputedSj[,c(-1:-3,-19)],
+             y = fit$fit$residuals,
+             sizes = varSeq,
+             metric = "RMSE",
+             rfeControl = ctrl,
+             ntree = 500)
+
+rfRFE_timeEffect$optVariables
+```
+
+```{r}
+x <- model.matrix(total_cases ~ ., data = trainImputedSj[,-1:-3])[,-1]
+cv.out <- glmnet::cv.glmnet(x,y = trainImputedSj$total_cases, family = "poisson", alpha = 1)
+plot(cv.out)
+out <- glmnet::glmnet(x,trainImputedSj$total_cases, family = 'poisson',lambda = cv.out$lambda.min, alpha = 1)
+topPredLasso_PresentTime <- abs(predict(out,type = "coefficients",s=cv.out$lambda.min))
+
+topPredL_presentTime <- data.frame(Predictors = topPredLasso_PresentTime@Dimnames[[1]][topPredLasso_PresentTime@i+1],
+Coefs = topPredLasso_PresentTime@x) 
+
+topPredL_presentTime %<>% arrange(desc(Coefs)) %>% filter(!Predictors == "(Intercept)")
+```
+
+ 
+```{r}
+Box.test(fit$fit$residuals)
+cv.out <- glmnet::cv.glmnet(x = model.matrix(total_cases ~ ., trainImputedSj[,c(-1:-3)])[,-1],y = as.numeric(fit$fit$residuals), alpha = 1)
+out <- glmnet::glmnet(x,trainImputedSj$total_cases,lambda = cv.out$lambda.min, alpha = 1)
+topPredLasso <- abs(predict(out,type = "coefficients",s=cv.out$lambda.min))
+topPredLasso
+topPredL <- data.frame(Predictors = topPredLasso@Dimnames[[1]][topPredLasso@i+1],
+Coefs = topPredLasso@x) 
+
+topPredL %<>% arrange(desc(Coefs)) %>% filter(!Predictors == "(Intercept)")
+```
+
+
+# Are the predictors stationary?
+
+```{r}
 
 ```
 
