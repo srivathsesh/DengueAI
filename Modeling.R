@@ -9,9 +9,12 @@ library(dyn)
 library(caret)
 library(tidyr)
 library(caret)
+library(purrr)
+library(dplyr)
 source('~/Documents/MSPA/PREDICT 413/DengAI/generateLaggedPredictors.R')
 source('~/Documents/MSPA/PREDICT 413/DengAI/LinearFit.R')
 source('~/Documents/MSPA/PREDICT 413/DengAI/RetrievePredictors.R')
+source('~/Documents/MSPA/PREDICT 413/DengAI/dynfit.R')
 
 #**************************************************
 # THE CODE IS A CONTINUATION FROM MARKDOWN
@@ -24,7 +27,7 @@ source('~/Documents/MSPA/PREDICT 413/DengAI/RetrievePredictors.R')
 
 # 1. As is 
 #----------------------------------------
-y <- tsTrainImputedSj$total_cases
+y <- tsTrainImputedSj$total_cases # Expecting this to be a zoo object
 
 # 2. Transformed to stabilize variation (BoxCox)
 #----------------------------------------
@@ -51,6 +54,7 @@ y.boxcox.diff <- diff(y.boxcox)
 #     Model Matrix
 #---------------------------------------
 x.train <- model.matrix(total_cases ~ ., data = tsTrainImputedSj)[,-1]
+x.train <- zoo(x.train,order.by = time(y))
 
 #---------------------------------------------------
 # Quick check on feature selection from the markdown 
@@ -98,7 +102,7 @@ predictors(rfRFE.Differenced)
 #----------------------------------------------------------------------------------
 #  Generate rolling window of time 
 #----------------------------------------------------------------------------------
-window(zoo::index(x.train), start = 1, end = )
+
 
 inputlist <- data.frame(starts = c(1,52*3, 52*6, 52*9,52*12),
 ends = c(52*6, 9*52, 12*52, 52*15,52*18))
@@ -156,39 +160,79 @@ plot(varImp(gbmTuneStationary))
 
 predictors(gbmTune)
 
-# initial model
-
-LaggedX <- generatedLaggedPredictors(x.train,head(predictors(gbmTune),8),rep(8,8))
-intialmdl <- linearfit(x.train,as.numeric(y.boxcox),head(predictors(gbmTune),8),lags = rep(8,8),RespLag = 1)
-revisedmdl2 <- linearfit(x.train,y.boxcox,c('reanalysis_relative_humidity_percent','reanalysis_precip_amt_kg_per_m2','reanalysis_max_air_temp_k',"ndvi_ne","ndvi_nw","ndvi_se","ndvi_sw"),lags = c(8,8,4,4,4,4,4),RespLag = 2,specificLags = T)
 
 # Apply model functions to data
 
-start_up %<>% mutate(varnames = rep(list(c('reanalysis_relative_humidity_percent','reanalysis_precip_amt_kg_per_m2','reanalysis_max_air_temp_k',"ndvi_ne","ndvi_nw","ndvi_se","ndvi_sw")),5)) %>% 
-  mutate(lags = rep(list(c(8,8,4,4,4,4,4)),5)) %>% 
-  mutate(RespLag = 1) %>% 
-  mutate(specificLags = T)
+start_up %<>% mutate(varnames = rep(list(c('reanalysis_relative_humidity_percent','reanalysis_precip_amt_kg_per_m2','reanalysis_max_air_temp_k',"ndvi_ne","ndvi_nw","ndvi_se","ndvi_sw",'total_cases')),5)) %>% 
+  mutate(lags = rep(list(c(8,8,4,4,4,4,4,1)),5)) 
 
+model_list <- list(Mdl = dynfit)
 
 ModelFrame <- enframe(rep(model_list,5),name = 'modelname',value = 'model')
 
 ModelResults <- start_up %>% select(-1,-3) %>% 
-  `colnames<-`(c('x','y','varnames','lags','RespLag','specificLags')) %>% 
-  mutate(params = pmap(.,function(x,y,varnames,lags,RespLag,specificLags){
-    list(x = x, y = y, varnames = varnames, lags = lags,RespLag = RespLag, specificLags = specificLags)
+  `colnames<-`(c('x','y','varnames','lags')) %>% 
+  mutate(params = pmap(.,function(x,y,varnames,lags){
+    list(x = x, y = y, varnames = varnames, lags = lags)
   }))
   
 ModelResults %<>% bind_cols(.,ModelFrame) %>% 
   mutate(mdlResult = invoke_map(model,params))
 
 
-LinerFitResults <- sModelResults %>% map(.x = .$mdlResult, .f = ~glance(.x))
+LinerFitResults <- ModelResults %>% map(.x = .$mdlResult, .f = ~glance(.x))
 
 
-#---------------------------------------------------------------
-# Make Predictons
-# -------------------------------------------------
+#----------------------------------------------------------------------------
+#                         Make Predictions
+#-----------------------------------------------------------------------------
 
-testing <- start_up %>% select(varnames,lags) %>% unnest() %>% head(7) %>% mutate(currentdate = "1996-04-29") %>% mutate(data = list(tsTrainImputedSj)) %>% mutate(lags = as.integer(lags))
+getnewdata <-  function(x,y,currentTime){
+  start <- time(head(x,1))
+  end <- currentTime + 7
 
-testing %>% pmap(.f = RetrievePredictors) %>% Reduce(cbind,.) %>% colMeans(.,na.rm = T) %>% rbind(.)
+  
+  newdata = zooreg(cbind(x = window(x,start = start, end = end),y = window(y,start = start, end = end)), start = start, end = end )
+  #list2env(data.frame(newdata),.GlobalEnv)
+  return(newdata)
+}
+
+# Forecast vector prep
+
+statrtTime <- as.Date('1990-04-30')
+currentTime <- as.Date('1996-04-29')
+
+#InitialValues <- window(y.boxcox,start = start = '1990-04-30', end = '1996-04-30')
+
+# ---------------------------------------------------------------------------
+#               One ahead forecast
+#----------------------------------------------------------------------------
+
+oneaheadForecast <- function (x,y,currentTime,model){
+  
+  newdata <- getnewdata(x,y,currentTime)
+  prediction <- predict(model,newdata)
+  tail(prediction$mean,1)
+}
+
+MakePredictions <- function(x, y, currentTime, model, until) {
+  browser()
+  # predictions <-window(y, start = '1990-04-30', end = currentTime)
+  # predictions <- rbind.zoo(coredata(predictions), rep(NA,ceiling(difftime(strptime(until,"%Y-%m-%d"),strptime(currentTime + 1, "%Y-%m-%d"),units ='weeks'))))
+  #predictions <- zoo(predictions,order.by = time(window(x,start = '1990-04-30', end = until)))
+  startindex = which(index(y)==currentTime) + 1
+  y[startindex : nrow(y)] <- NA
+  while (currentTime <= until) {
+    oneaheadPred <- oneaheadForecast(x,y, currentTime, model)
+    currentTime <- currentTime + 7
+    y[currentTime,1] <- oneaheadPred
+    
+  }
+  return(predictions)
+}
+
+
+fct <- MakePredictions(x.train,y.boxcox,currentTime = currentTime,model = mdl1,as.Date('1999-04-23'))
+
+
+
