@@ -11,10 +11,10 @@ library(tidyr)
 library(caret)
 library(purrr)
 library(dplyr)
-source('~/Documents/MSPA/PREDICT 413/DengAI/generateLaggedPredictors.R')
-source('~/Documents/MSPA/PREDICT 413/DengAI/LinearFit.R')
-source('~/Documents/MSPA/PREDICT 413/DengAI/RetrievePredictors.R')
-source('~/Documents/MSPA/PREDICT 413/DengAI/dynfit.R')
+source('generateLaggedPredictors.R')
+source('LinearFit.R')
+source('RetrievePredictors.R')
+source('dynfit.R')
 
 #**************************************************
 # THE CODE IS A CONTINUATION FROM MARKDOWN
