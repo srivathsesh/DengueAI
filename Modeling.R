@@ -189,10 +189,10 @@ LinerFitResults <- ModelResults %>% map(.x = .$mdlResult, .f = ~glance(.x))
 
 getnewdata <-  function(x,y,currentTime){
   start <- time(head(x,1))
-  end <- currentTime + 7
+  end <- currentTime + 1
 
-  
-  newdata = zooreg(cbind(x = window(x,start = start, end = end),y = window(y,start = start, end = end)), start = start, end = end )
+  newdata = zooreg(cbind(x = x[1:end,], y = y[1:end,]),order.by = time(y[1:end,]))
+  #newdata = zooreg(cbind(x = window(x,start = start, end = end),y = window(y,start = start, end = end)), start = start, end = end )
   #list2env(data.frame(newdata),.GlobalEnv)
   return(newdata)
 }
@@ -220,11 +220,12 @@ MakePredictions <- function(x, y, currentTime, model, until) {
   # predictions <-window(y, start = '1990-04-30', end = currentTime)
   # predictions <- rbind.zoo(coredata(predictions), rep(NA,ceiling(difftime(strptime(until,"%Y-%m-%d"),strptime(currentTime + 1, "%Y-%m-%d"),units ='weeks'))))
   #predictions <- zoo(predictions,order.by = time(window(x,start = '1990-04-30', end = until)))
-  startindex = which(index(y)==currentTime) + 1
-  y[startindex : nrow(y)] <- NA
-  while (currentTime <= until) {
+  #startindex = which(index(y)==currentTime) + 1
+  future = currentTime + 1
+  y[future : nrow(y),] <- NA
+  while (future <= until) {
     oneaheadPred <- oneaheadForecast(x,y, currentTime, model)
-    currentTime <- currentTime + 7
+    currentTime <- currentTime + 1
     y[currentTime,1] <- oneaheadPred
     
   }
