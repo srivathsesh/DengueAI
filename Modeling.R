@@ -222,8 +222,12 @@ getnewdata <-  function(x,y,currentTime){
 #----------------------------------------------------------------------------
 
 oneaheadForecast <- function (x,y,currentTime,model,...){
+  if('ARIMA' %in% class(model)){
+    newdata <- getnewdata4Arima(x,y,currentTime)
+  } else {
+    newdata <- getnewdata(x,y,currentTime)
+  }
   
-  newdata <- getnewdata(x,y,currentTime)
   # x.newfit <- x[1:currentTime,]
   # y.newfit <- y[1:currentTime]
   # model = dynfit(x.newfit,y.newfit,ModelResults$varnames[[1]], ModelResults$lags[[1]])
@@ -231,8 +235,9 @@ oneaheadForecast <- function (x,y,currentTime,model,...){
     prediction <- predict(model,newdata)
   } else{
     if('ARIMA' %in% class(model))
-      browser()
+      #browser()
       prediction <- predict(model,n.step = 1, newxreg = newdata)
+      return(tail(prediction$pred,1))
   }
   
   tail(prediction$mean,1)
@@ -361,16 +366,22 @@ specificLags = T)
 
 AutoArimamdl <- auto.arima(y.boxcox[468:623], xreg = laggedPred[468:623,])
 
-ArimaFcts <- MakePredictions(laggedPred,y.boxcox,currentTime = 623,model = AutoArimamdl, 936)
+
 
 
 # get new data for ARIMA
 
 getnewdata4Arima <- function(x,ypred,currentTime) {
+  #browser()
   total_cases.lag1 <- L(ypred[1:currentTime],1)
-  newdata <- cbind(zooreg(x[currentTime,]),total_cases.lag1[currentTime,1])
+  newdata <- cbind(zooreg(x[currentTime,-10]),total_cases.lag1[currentTime,1])
+  colnames(newdata)[10] <- 'total_cases.lag1'
   return(newdata)
 }
 
 
+ArimaFcts <- MakePredictions(laggedPred,y.boxcox,currentTime = 623,model = AutoArimamdl, 936)
 
+plot(y.boxcox[623:936,1])
+lines(ArimaFcts,col = 'red')
+lines(fct3,col = 'blue')
