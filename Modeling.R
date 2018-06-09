@@ -378,7 +378,7 @@ laggedPred2 <- generatedLaggedPredictors(cbind(x.train,y.boxcox), c(
 ),c(suggestedLags$lags[c(-1,-2,-4,-5,-6,-7,-8)],1),
 specificLags = T)
 
-AutoArimamdl <- auto.arima(y.boxcox[468:623], xreg = laggedPred2[468:623,])
+AutoArimamdl <- auto.arima(y.boxcox[468:623], xreg = laggedPred[468:623,])
 
 AutoArimamdl2 <- auto.arima(y.boxcox[468:623], xreg = laggedPred2[468:623,])
 
@@ -402,14 +402,157 @@ lines(fct3,col = 'blue')
 ArimaFcts2 <- MakePredictions(laggedPred2,y.boxcox,currentTime = 623,model = AutoArimamdl2, 936)
 
 plot(y.boxcox[623:936,1])
-lines(ArimaFcts[623:936],col = 'red')
-lines(fct3,col = 'blue')
+# lines(ArimaFcts[623:936],col = 'red')
+# lines(fct3,col = 'blue')
 lines(ArimaFcts2[623:936],col = 'purple')
 
 
 #***********************************************************************
 #                OUT OF SAMPLE PREDICTIONS
 #***********************************************************************
+
+# Here we take the middle of the time series as a benchmark of training set and then predict both the history and future of the training set
+
+plot(y,grid.ticks.on = F)
+lines(y[468:623,], col = 'red')
+lines(y[624:936,], col = 'blue', lwd = 2)
+lines(y[80:467,], col = 'green', lwd = 2)
+addLegend(legend.loc = "topright", legend.names = c('Training','Hold out future', 'Holdout past'),col = c('red','blue','green'), lwd = 2)
+
+# 1. Linear models
+#****************
+# Linear model with  the following as predictors based on Recurrsive Feature Elimination
+# 
+# reanalysis_relative_humidity_percent',
+# 'reanalysis_precip_amt_kg_per_m2',
+# 'reanalysis_max_air_temp_k',
+# "ndvi_ne",
+# "ndvi_nw",
+# "ndvi_se",
+# "ndvi_sw",
+# 'total_cases'
+
+
+# MEtric MAE.
+#************
+
+# PErformance of mdl1 on future hold out
+
+fctHoloutFuture <- MakePredictions(x.train,y.boxcox,currentTime = 623,model = mdl1,936)
+
+plot(y.boxcox[623:936],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by linear model 1 on hold out set")
+lines(fctHoloutFuture,col = 'red')
+addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','LinearModel1 prediction'),col = c('black','red'),lty = 1)
+
+fctHoloutFuture.Actuals <- InvBoxCox(fctHoloutFuture,lambda)
+
+MAE.mdl1 <- mean(abs(fctHoloutFuture.Actuals[624:936] - y[624:936,]))
+
+# PErformance of mdl12 on future hold out
+fct2HoloutFuture <- MakePredictions(x.train,y.boxcox,currentTime = 623,model = mdl2,936)
+
+plot(y.boxcox[623:936],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by linear model 2 on hold out set")
+lines(fct2HoloutFuture,col = 'red')
+addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','LinearModel2 prediction'),col = c('black','red'),lty = 1)
+
+fct2HoloutFuture.Actuals <- InvBoxCox(fct2HoloutFuture,lambda)
+
+MAE.mdl2 <- mean(abs(fct2HoloutFuture.Actuals[624:936] - y[624:936,]))
+
+# PErformance of mdl3  on future hold out
+fct3HoloutFuture <- MakePredictions(x.train,y.boxcox,currentTime = 623,model = mdl3,936)
+
+plot(y.boxcox[623:936],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by linear model 3 on hold out set")
+lines(fct3HoloutFuture,col = 'red')
+addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','LinearModel3 prediction'),col = c('black','red'),lty = 1)
+
+fct3HoloutFuture.Actuals <- InvBoxCox(fct3HoloutFuture,lambda)
+
+MAE.mdl3 <- mean(abs(fct3HoloutFuture.Actuals[624:936] - y[624:936,]))
+
+
+
+
+# Performance of Linear model based on stepwise feature selection 
+#****************************************************************
+
+# Features selected based on RFE and CCF. 
+
+suggestedLags
+
+# The below features and their lags were included in the models for a stepwise search
+
+#                               predictor lags correlation
+# 1 reanalysis_relative_humidity_percent    9  0.30837942
+# 2      reanalysis_precip_amt_kg_per_m2    5  0.19337887
+# 3            reanalysis_max_air_temp_k    8  0.42293961
+# 4                              ndvi_ne    8  0.07305284
+# 5                              ndvi_nw   10  0.14804305
+# 6                              ndvi_se   10  0.06995947
+# 7                              ndvi_sw    5  0.02764198
+# 8         reanalysis_sat_precip_amt_mm    5  0.13448162
+# 9                    reanalysis_tdtr_k    2  0.13876079
+
+
+# The resultant model was 
+
+summary(selectionmdl)
+
+# The predictors were narrowed to reanalysis_max_air_temp_k with lag of 8 (2 months),  reanalysis_tdtr_k with lag of 2 and lag 1 of the response 
+
+selectionmdlfct <- MakePredictions(x.train,y.boxcox,currentTime = 623,model = selectionmdl,936)
+
+plot(y.boxcox[623:936],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by reduced Linear model on hold out set")
+lines(selectionmdlfct,col = 'red')
+addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','Reduced Linear prediction'),col = c('black','red'),lty = 1)
+
+stepwiseActuals <- InvBoxCox(selectionmdlfct,lambda)
+
+MAE.StepWise <- mean(abs(stepwiseActuals[624:936] - y[624:936,]))
+
+
+#************************************************************************
+#              Arima model performance
+#************************************************************************
+
+ArimaFcts <- MakePredictions(laggedPred,y.boxcox,currentTime = 623,model = AutoArimamdl, 936)
+
+plot(y.boxcox[623:936,1],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by Arima model(larger predictor pool) on hold out set")
+lines(ArimaFcts,col = 'red')
+addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','Arima - larger predictors pool'),col = c('black','red'),lty = 1)
+
+ArimaFctActuals <- InvBoxCox(ArimaFcts,lambda)
+MAE.Arima1 <- mean(abs(ArimaFctActuals[624:936] - y[624:936,]))
+
+
+
+
+ArimaFcts2 <- MakePredictions(laggedPred2,y.boxcox,currentTime = 623,model = AutoArimamdl2, 936)
+
+
+plot(y.boxcox[623:936,1],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by Arima model(smaller predictor pool) on hold out set")
+# lines(ArimaFcts[623:936],col = 'red')
+# lines(fct3,col = 'blue')
+lines(ArimaFcts2[623:936],col = 'red')
+addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','Arima - smaller predictors pool'),col = c('black','red'),lty = 1)
+
+ArimaFct2Actuals <- InvBoxCox(ArimaFcts2,lambda)
+MAE.Arima2 <- mean(abs(ArimaFct2Actuals[624:936] - y[624:936,]))
+
+#****************************************************************************
+#                         Knn forecasts
+#****************************************************************************
+
+plot(knnTune, main = "Choice of K for KNN" )
+
+fctknnTuned <- predict(refitknn,newdata = data.frame(laggedPred2[624:936,]))
+
+plot(y.boxcox[623:936,1],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by KNN on hold out set")
+lines(xts(fctknnTuned,order.by = time(y.boxcox[624:936,1])),col = 'red')
+addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','KNN forecast'),col = c('black','red'),lty = 1)
+
+fctknnTuned.Actuals <- forecast::InvBoxCox(fctknnTuned,lambda)
+MAE.KNN <- mean(abs(fctknnTuned.Actuals - y[624:936,]))
 
 
 
