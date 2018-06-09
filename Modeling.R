@@ -364,18 +364,31 @@ laggedPred <- generatedLaggedPredictors(cbind(x.train,y.boxcox), c(
 ),c(suggestedLags$lags,1),
 specificLags = T)
 
-AutoArimamdl <- auto.arima(y.boxcox[468:623], xreg = laggedPred[468:623,])
 
+laggedPred2 <- generatedLaggedPredictors(cbind(x.train,y.boxcox), c(
+#  'reanalysis_relative_humidity_percent',
+#  'reanalysis_precip_amt_kg_per_m2',
+  'reanalysis_max_air_temp_k',
+#  "ndvi_ne","ndvi_nw",
+# "ndvi_se",
+  # "ndvi_sw",
+  # "reanalysis_sat_precip_amt_mm",
+  "reanalysis_tdtr_k",
+  "total_cases"
+),c(suggestedLags$lags[c(-1,-2,-4,-5,-6,-7,-8)],1),
+specificLags = T)
 
+AutoArimamdl <- auto.arima(y.boxcox[468:623], xreg = laggedPred2[468:623,])
 
+AutoArimamdl2 <- auto.arima(y.boxcox[468:623], xreg = laggedPred2[468:623,])
 
+#**********************************************************************
 # get new data for ARIMA
-
+#***********************************************************************
 getnewdata4Arima <- function(x,ypred,currentTime) {
-  #browser()
   total_cases.lag1 <- L(ypred[1:currentTime],1)
-  newdata <- cbind(zooreg(x[currentTime,-10]),total_cases.lag1[currentTime,1])
-  colnames(newdata)[10] <- 'total_cases.lag1'
+  newdata <- cbind(zooreg(x[currentTime,-ncol(x)]),total_cases.lag1[currentTime,1])
+  colnames(newdata)[ncol(newdata)] <- 'total_cases.lag1'
   return(newdata)
 }
 
@@ -385,3 +398,18 @@ ArimaFcts <- MakePredictions(laggedPred,y.boxcox,currentTime = 623,model = AutoA
 plot(y.boxcox[623:936,1])
 lines(ArimaFcts,col = 'red')
 lines(fct3,col = 'blue')
+
+ArimaFcts2 <- MakePredictions(laggedPred2,y.boxcox,currentTime = 623,model = AutoArimamdl2, 936)
+
+plot(y.boxcox[623:936,1])
+lines(ArimaFcts[623:936],col = 'red')
+lines(fct3,col = 'blue')
+lines(ArimaFcts2[623:936],col = 'purple')
+
+
+#***********************************************************************
+#                OUT OF SAMPLE PREDICTIONS
+#***********************************************************************
+
+
+
