@@ -208,9 +208,8 @@ LinerFitResults <- ModelResults %>% map(.x = .$mdlResult, .f = ~glance(.x))
 
 
 getnewdata <-  function(x,y,currentTime){
-  start <- time(head(x,1))
+  #start <- time(head(x,1))
   end <- currentTime + 1
-
   newdata = zooreg(cbind(x = x[1:end,], y = y[1:end,]),order.by = time(y[1:end,]))
 
   return(newdata)
@@ -228,7 +227,14 @@ oneaheadForecast <- function (x,y,currentTime,model,...){
   # x.newfit <- x[1:currentTime,]
   # y.newfit <- y[1:currentTime]
   # model = dynfit(x.newfit,y.newfit,ModelResults$varnames[[1]], ModelResults$lags[[1]])
-  prediction <- predict(model,newdata)
+  if('dyn' %in% class(model)){
+    prediction <- predict(model,newdata)
+  } else{
+    if('ARIMA' %in% class(model))
+      browser()
+      prediction <- predict(model,n.step = 1, newxreg = newdata)
+  }
+  
   tail(prediction$mean,1)
 }
 
@@ -332,6 +338,39 @@ lines(selectionmdlfct,col = 'red')
 lines(fct4,col ='blue')
 
 # Very similar to shoot from the hip model
+
+
+#************************************************************************
+#    ARIMA with xreg
+#************************************************************************
+
+# Naive  out of the  box model
+
+laggedPred <- generatedLaggedPredictors(cbind(x.train,y.boxcox), c(
+  'reanalysis_relative_humidity_percent',
+  'reanalysis_precip_amt_kg_per_m2',
+  'reanalysis_max_air_temp_k',
+  "ndvi_ne","ndvi_nw",
+  "ndvi_se",
+  "ndvi_sw",
+  "reanalysis_sat_precip_amt_mm",
+  "reanalysis_tdtr_k",
+  "total_cases"
+),c(suggestedLags$lags,1),
+specificLags = T)
+
+AutoArimamdl <- auto.arima(y.boxcox[468:623], xreg = laggedPred[468:623,])
+
+ArimaFcts <- MakePredictions(laggedPred,y.boxcox,currentTime = 623,model = AutoArimamdl, 936)
+
+
+# get new data for ARIMA
+
+getnewdata4Arima <- function(x,ypred,currentTime) {
+  total_cases.lag1 <- L(ypred[1:currentTime],1)
+  newdata <- cbind(zooreg(x[currentTime,]),total_cases.lag1[currentTime,1])
+  return(newdata)
+}
 
 
 
