@@ -163,8 +163,23 @@ predictors(gbmTune)
 
 # Apply model functions to data
 
-start_up %<>% mutate(varnames = rep(list(c('reanalysis_relative_humidity_percent','reanalysis_precip_amt_kg_per_m2','reanalysis_max_air_temp_k',"ndvi_ne","ndvi_nw","ndvi_se","ndvi_sw",'total_cases')),5)) %>% 
-  mutate(lags = rep(list(c(8,8,4,4,4,4,4,1)),5)) 
+#******************************************************************************
+#                   Naive regression model
+#******************************************************************************
+
+start_up %<>% mutate(varnames = rep(list(
+  c(
+    'reanalysis_relative_humidity_percent',
+    'reanalysis_precip_amt_kg_per_m2',
+    'reanalysis_max_air_temp_k',
+    "ndvi_ne",
+    "ndvi_nw",
+    "ndvi_se",
+    "ndvi_sw",
+    'total_cases'
+  )
+), 5)) %>%
+  mutate(lags = rep(list(c(8, 8, 4, 4, 4, 4, 4, 1)), 5)) 
 
 model_list <- list(Mdl = dynfit)
 
@@ -182,27 +197,26 @@ ModelResults %<>% bind_cols(.,ModelFrame) %>%
 
 LinerFitResults <- ModelResults %>% map(.x = .$mdlResult, .f = ~glance(.x))
 
+#****************************************************************************
+#                         UTILITY FUNCTIONS
+#****************************************************************************
+
 
 #----------------------------------------------------------------------------
-#                         Make Predictions
+#                         Get newdata
 #-----------------------------------------------------------------------------
+
 
 getnewdata <-  function(x,y,currentTime){
   start <- time(head(x,1))
   end <- currentTime + 1
 
   newdata = zooreg(cbind(x = x[1:end,], y = y[1:end,]),order.by = time(y[1:end,]))
-  #newdata = zooreg(cbind(x = window(x,start = start, end = end),y = window(y,start = start, end = end)), start = start, end = end )
-  #list2env(data.frame(newdata),.GlobalEnv)
+
   return(newdata)
 }
 
-# Forecast vector prep
 
-statrtTime <- as.Date('1990-04-30')
-currentTime <- as.Date('1996-04-29')
-
-#InitialValues <- window(y.boxcox,start = start = '1990-04-30', end = '1996-04-30')
 
 # ---------------------------------------------------------------------------
 #               One ahead forecast
@@ -215,25 +229,43 @@ oneaheadForecast <- function (x,y,currentTime,model){
   tail(prediction$mean,1)
 }
 
+#----------------------------------------------------------------------------
+#                         Make Predictions
+#-----------------------------------------------------------------------------
+
 MakePredictions <- function(x, y, currentTime, model, until) {
-  browser()
+
   # predictions <-window(y, start = '1990-04-30', end = currentTime)
   # predictions <- rbind.zoo(coredata(predictions), rep(NA,ceiling(difftime(strptime(until,"%Y-%m-%d"),strptime(currentTime + 1, "%Y-%m-%d"),units ='weeks'))))
   #predictions <- zoo(predictions,order.by = time(window(x,start = '1990-04-30', end = until)))
   #startindex = which(index(y)==currentTime) + 1
   future = currentTime + 1
   y[future : nrow(y),] <- NA
-  while (future <= until) {
+  while (currentTime < until) {
     oneaheadPred <- oneaheadForecast(x,y, currentTime, model)
-    currentTime <- currentTime + 1
+    currentTime<- currentTime + 1
     y[currentTime,1] <- oneaheadPred
     
   }
-  return(predictions)
+  return(y)
 }
 
 
-fct <- MakePredictions(x.train,y.boxcox,currentTime = currentTime,model = mdl1,as.Date('1999-04-23'))
+
+#******************************************************************
+#              Shoot from the hip linear model
+#******************************************************************
+
+statrtTime <- as.Date('1990-04-30')
+currentTime <- 312 #as.Date('1996-04-29')
 
 
+mdl1 <- ModelResults$mdlResult[[1]]
+fct <- MakePredictions(x.train,y.boxcox,currentTime = 312,model = mdl1,400)
 
+mdl2 <- ModelResults$mdlResult[[2]]
+head(start_up$Pred[[2]])
+
+
+currentTime = 468
+fct <- MakePredictions(x.train,y.boxcox,currentTime = 468,model = mdl1,936)

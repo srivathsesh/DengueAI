@@ -4,12 +4,12 @@
 
 pairwiseAcf <- function(x, y, varnames) {
   bestlag <- function(p) {
-    #browser()
-    cf.df <- Pacf(data.frame(y, x[, p]), plot = T)
+    # browser()
+    cf.df <- forecast::Ccf(y[,1], x[, p], plot = T,lag.max = 10)
     data.frame(
       predictor = p,
-      lags = which.max(abs(cf.df[["acf"]][, 1, 2])),
-      correlation = abs(cf.df[["acf"]][, 1, 2])[which.max(abs(cf.df[["acf"]][, 1, 2]))]
+      lags = which.max(abs(cf.df[["acf"]][11:21, 1, 1]))-1,
+      correlation = abs(cf.df[["acf"]][11:21, 1, 1])[which.max(abs(cf.df[["acf"]][11:21, 1, 1]))]
     )
   }
   varnames %>% map_df(bestlag)
@@ -22,8 +22,10 @@ varnames <- c('reanalysis_relative_humidity_percent',
               'reanalysis_max_air_temp_k',
               "ndvi_ne","ndvi_nw",
               "ndvi_se",
-              "ndvi_sw")
+              "ndvi_sw",
+              "reanalysis_sat_precip_amt_mm",
+              "reanalysis_tdtr_k")
 
-lagstouse <- pairwiseAcf(x.train,y,varnames)
+lagstouse <- pairwiseAcf(ts(x.train,start = c(1990,18), frequency = 52),ts(y,start = c(1990,18), frequency = 52),varnames)
 
-Ccf(tsTotalcasesSj,ts(trainImputedSj$reanalysis_relative_humidity_percent,start = c(1990,18), frequency = 52))
+#lagCcf(tsTotalcasesSj,ts(trainImputedSj$reanalysis_relative_humidity_percent,start = c(1990,18), frequency = 52))
