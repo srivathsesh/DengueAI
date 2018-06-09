@@ -222,9 +222,12 @@ getnewdata <-  function(x,y,currentTime){
 #               One ahead forecast
 #----------------------------------------------------------------------------
 
-oneaheadForecast <- function (x,y,currentTime,model){
+oneaheadForecast <- function (x,y,currentTime,model,...){
   
   newdata <- getnewdata(x,y,currentTime)
+  # x.newfit <- x[1:currentTime,]
+  # y.newfit <- y[1:currentTime]
+  # model = dynfit(x.newfit,y.newfit,ModelResults$varnames[[1]], ModelResults$lags[[1]])
   prediction <- predict(model,newdata)
   tail(prediction$mean,1)
 }
@@ -262,10 +265,73 @@ currentTime <- 312 #as.Date('1996-04-29')
 
 mdl1 <- ModelResults$mdlResult[[1]]
 fct <- MakePredictions(x.train,y.boxcox,currentTime = 312,model = mdl1,400)
+plot(y.boxcox[313:400])
+lines(fct,col = 'red')
 
 mdl2 <- ModelResults$mdlResult[[2]]
 head(start_up$Pred[[2]])
 
 
 currentTime = 468
-fct <- MakePredictions(x.train,y.boxcox,currentTime = 468,model = mdl1,936)
+fct2 <- MakePredictions(x.train,y.boxcox,currentTime = 468,model = mdl2,936)
+plot(y.boxcox[468:936])
+lines(fct2,col = 'red')
+
+currentTime = 623
+mdl3 <- ModelResults$mdlResult[[3]]
+fct3 <- MakePredictions(x.train,y.boxcox,currentTime = 623,model = mdl3, 936)
+
+
+mdl4 <-  ModelResults$mdlResult[[4]]
+fct4 <- MakePredictions(x.train,y.boxcox,currentTime = 780,model = mdl4, 936)
+plot(y.boxcox[623:936])
+lines(fct3,col='blue')
+lines(fct4,col = 'red')
+
+# ********************************************************************
+#             Choice of lags
+#---------------------------------------------------------------------
+
+suggestedLags <- pairwiseAcf(ts(x.train,start = c(1990,18), frequency = 52),ts(y.boxcox,start = c(1990,18), frequency = 52),varnames)
+
+# revamped Start_up
+
+start_up %<>% mutate(varnames2 = rep(list(
+  c(
+    'reanalysis_relative_humidity_percent',
+    'reanalysis_precip_amt_kg_per_m2',
+    'reanalysis_max_air_temp_k',
+    "ndvi_ne","ndvi_nw",
+    "ndvi_se",
+    "ndvi_sw",
+    "reanalysis_sat_precip_amt_mm",
+    "reanalysis_tdtr_k",
+    "total_cases"
+  )
+), 5)) %>%
+  mutate(lags2 = rep(list(c(suggestedLags$lags,1)), 5)) 
+
+fullmodel <-
+  lm(
+    total_cases ~ L(reanalysis_relative_humidity_percent, 9) + L(reanalysis_precip_amt_kg_per_m2, 5) +
+      L(reanalysis_max_air_temp_k, 8) + L(ndvi_ne, 8) + L(ndvi_nw, 10) + L(ndvi_se, 10) +
+      L(ndvi_sw, 5) + L(reanalysis_sat_precip_amt_mm, 5) + L(reanalysis_tdtr_k, 2) +
+      L(total_cases, 1), data = data.frame(cbind(ModelResults$x[[4]],ModelResults$y[[4]]))
+      )
+library(MASS)
+selectionmdl <- stepAIC(fullmodel,direction = "both")
+selectionmdl <- dyn(selectionmdl)
+#**************************************************************************
+#  test out selectionnmdl
+#*************************************************************************
+
+selectionmdlfct <- MakePredictions(x.train,y.boxcox,currentTime = 780,model = selectionmdl,936)
+
+plot(y.boxcox[780:936])
+lines(selectionmdlfct,col = 'red')
+lines(fct4,col ='blue')
+
+# Very similar to shoot from the hip model
+
+
+

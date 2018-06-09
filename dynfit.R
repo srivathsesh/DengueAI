@@ -14,3 +14,8 @@ dynfit <- function(x,y,varnames,lags){
 }
 
 
+glsfit <- function(x,y,varnames,lags){
+  sample <- data.frame(cbind(x,y))
+  browser()
+  eval(parse(text = paste0('gls(total_cases ~',paste0('L(',varnames,',',lags,')',collapse = '+'),',data = sample, correlation = corAR1(form = ~ time(y)))')))
+}

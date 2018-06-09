@@ -29,3 +29,6 @@ varnames <- c('reanalysis_relative_humidity_percent',
 lagstouse <- pairwiseAcf(ts(x.train,start = c(1990,18), frequency = 52),ts(y,start = c(1990,18), frequency = 52),varnames)
 
 #lagCcf(tsTotalcasesSj,ts(trainImputedSj$reanalysis_relative_humidity_percent,start = c(1990,18), frequency = 52))
+
+lagstouse <- pairwiseAcf(ts(x.train.diff,start = c(1990,19), frequency = 52),ts(y.boxcox.diff,start = c(1990,18), frequency = 52),varnames)
+
