@@ -255,10 +255,17 @@ MakePredictions <- function(x, y, currentTime, model, until) {
   #startindex = which(index(y)==currentTime) + 1
   future = currentTime + 1
   y[future : nrow(y),] <- NA
+<<<<<<< Updated upstream
   while (currentTime < until) {
     oneaheadPred <- oneaheadForecast(x,y, currentTime, model)
     currentTime<- currentTime + 1
     y[currentTime,1] <- oneaheadPred
+=======
+  while (future <= until) {
+    oneaheadPred <- oneaheadForecast(x,y, future, model)
+    future <- currentTime + 1
+    y[future,1] <- oneaheadPred
+>>>>>>> Stashed changes
     
   }
   return(y)
