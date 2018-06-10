@@ -86,6 +86,8 @@ plot(trainImputedIq$station_avg_temp_c~trainImputedIq$week_start_date, col = ife
 ```
 
 
+
+
 ## 
 
 ```{r}
@@ -97,13 +99,17 @@ corrplot::corrplot(cormatSj,method = 'ellipse',tl.cex = 0.6,order = "hclust")
 
 
 cormatIq <- trainImputedIq %>% 
-  select_if(is.numeric) %>% cor(.)
+  select_if(is.numeric) %>% 
+  filter(year > 2001) %>% 
+  cor(.)
 
 corrplot::corrplot(cormatIq, method = 'ellipse',tl.cex = 0.6, order = 'hclust')
 
 HighCorIq <- findCorrelation(cormatIq, names = T)
 HighCorSj <- findCorrelation(cormatSj, names = T)
 
+HighCorIq
+HighCorSj
 ```
 
 ```{r}
@@ -116,6 +122,13 @@ ggseasonplot(ts(trainImputedSj$reanalysis_relative_humidity_percent,start = c(19
 
 ggseasonplot(ts(trainImputedSj$reanalysis_max_air_temp_k, start = c(1990,18), frequency = 52)) +  theme_classic() + theme(legend.position = "none",plot.title = element_text(hjust = 0.5),axis.text.x = element_text(size = 5)) + ggtitle("Reanalysis_max_air_temp_K")
 
+
+tsTotalcasesIq <- ts(trainImputedIq$total_cases, start = c(2000,26), frequency = 52)
+ggseasonplot(tsTotalcasesIq)  
+
+ggseasonplot(ts(trainImputedIq$reanalysis_relative_humidity_percent,start = c(2000,26), frequency = 52)) + theme_classic() +theme(legend.position = "none",plot.title = element_text(hjust = 0.5),axis.text.x = element_text(size = 5)) + ggtitle("Reanalysis_relative_humidity_% - Iq")
+
+ggseasonplot(ts(trainImputedIq$reanalysis_max_air_temp_k, start = c(2000,26), frequency = 52)) +  theme_classic() + theme(legend.position = "none",plot.title = element_text(hjust = 0.5),axis.text.x = element_text(size = 5)) + ggtitle("Reanalysis_max_air_temp_K - IQ")
 ```
 
 
@@ -134,6 +147,15 @@ trainImputedSj %<>%
 tsTrainImputedSj <-  xts::xts(trainImputedSj[,-1:-3],order.by = trainImputedSj$week_start_date, frequency = 52)
 
 #ccf2(trainImputedSj$total_cases,trainImputedSj$reanalysis_specific_humidity_g_per_kg,max.lag = 15)
+
+# Removing 2001 data for analysis and feature selection. Assuming data was not properly collected during those times
+trainImputedIq %<>% 
+  filter(year > 2001) %>% 
+  select(-city,-Year.Week) %>% 
+  select(-one_of(!!HighCorIq)) %>% 
+  select(-ends_with("imp"))
+
+tsTrainImputedIq <-  xts::xts(trainImputedIq[,-1:-3],order.by = trainImputedIq$week_start_date, frequency = 52)
 ```
 
 ## Random forest
@@ -159,6 +181,21 @@ rfRFE <- rfe(x = trainImputedSj[,c(-1:-3,-19)],
 
 
 predictors(rfRFE)
+
+# Iq
+
+rfRFEiq <- rfe(x = trainImputedIq[,c(-1:-3,-21)],
+             y = trainImputedIq$total_cases,
+             sizes = varSeq,
+             metric = "RMSE",
+             rfeControl = ctrl,
+             ntree = 500)
+             #ntree = 1000)
+
+
+predictors(rfRFEiq)
+
+
 ```
 
 ### random forest after removing the effect of time

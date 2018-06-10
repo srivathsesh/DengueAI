@@ -1,0 +1,62 @@
+---
+title: "Final Project Presentation"
+author: "Sri Seshadri"
+date: "6/9/2018"
+output:
+  slidy_presentation: default
+  ioslides_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+load("~/Documents/MSPA/PREDICT 413/DengAI/.RData")
+library(xts)
+```
+
+## Key things in the data
+
+
+- Missing data
+    + Knn Impute
+- Spikes in seasonal variation
+    + BoxCox transformation
+  
+```{r}
+
+par(mfrow = c(2,1))
+plot(y,grid.ticks.on = F)
+plot(y.boxcox,grid.ticks.on = F)
+```
+  
+
+
+
+## Feature selection
+
+- SME - Journals (like PLoS)
+- Recursive Features Elimination (RFE)
+    + Random Forest
+    + Boosinting
+- Lasso 
+- Filter methods
+- Wrapper methods
+    + CCF
+    + PaCF
+
+
+## Model Summary
+
+```{r}
+pander::pander(summaryMAE)
+```
+
+## How the OOS prediction look?
+
+```{r}
+pp<- plot(y.boxcox[623:936,1],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by KNN on hold out set")
+pp<- lines(xts(fctknnTuned,order.by = time(y.boxcox[624:936,1])),col = 'red')
+pp<- addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','KNN forecast'),col = c('black','red'),lty = 1)
+pp
+```
+
+

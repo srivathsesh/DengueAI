@@ -1,0 +1,45 @@
+FinalProject
+========================================================
+author: Sri Seshadri
+date: 9th June 2018
+autosize: true
+
+Key things in the data
+========================================================
+
+
+- Missing data
+  + Knn Impute
+  
+```{r}
+load("~/Documents/MSPA/PREDICT 413/DengAI/.RData")
+par(mfrow = c(2,1))
+plot(tsTrainImputedSj$total_cases,grid.ticks.on = F)
+plot(y.boxcox,grid.ticks.on = F)
+```
+  
+- Spikes in seasonal variation
+  + BoxCox transformation
+
+Feature selection
+========================================================
+- SME - Journals (like PLoS)
+- Recursive Features Elimination (RFE)
+  + Random Forest
+  + Boosinting
+- Lasso 
+- Filter methods
+- Wrapper methods
+  + CCF
+  + PaCF
+
+
+Model Summary
+========================================================
+
+ San Juan 
+ 
+```{r}
+pander::pander(summaryMAE)
+```
+
