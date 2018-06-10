@@ -555,4 +555,13 @@ fctknnTuned.Actuals <- forecast::InvBoxCox(fctknnTuned,lambda)
 MAE.KNN <- mean(abs(fctknnTuned.Actuals - y[624:936,]))
 
 
+# Summary sofar
+
+ModelCategory <- c(rep("Linear Model", 4) , rep("ARIMA",2), rep("KNN",2))
+Modelnames <- c("mdl1", "mdl2", "mdl3", "stepwise", "ARIMA1", "ARIMA2", "KNN -naive lags", "KNN")
+Description <- c(rep("Predictors based on rfRFE & lasso",3),"Predictors - Stepwise selection", "Predictors based on rfRFE"," predictors by stepwise & CCF", "Lagged response - ccf", "Predictors - Stepwise selection & CCFs based lags")
+MAES <- c(MAE.mdl1[[1]],MAE.mdl2[[1]],MAE.mdl3[[1]],MAE.StepWise[[1]], MAE.Arima1[[1]], MAE.Arima2[[1]],MAE.KnnNaive[[1]],MAE.KNN[[1]])
+
+summaryMAE <- data.frame(ModelCategory ,Modelnames,
+                         Description,MAES)
 

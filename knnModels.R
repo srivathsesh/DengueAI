@@ -15,12 +15,12 @@ knnforecasting <- function(k){
   # plot(y.boxcox[624:924,1])
   # lines(predictionknn,col = 'red')
   
-  RMSE <- sqrt(mean((y.boxcox[624:924,] - predictionknn)^2))
-  data.frame(k = k, RMSE)
+  MAE.Knn.Naive <- mean(abs(y[624:924,] - InvBoxCox(predictionknn,lambda)))
+  data.frame(k = k, MAE.Knn.Naive)
   
 }
 
-2:10 %>% purrr::map_df(knnforecasting)
+MAE.KnnNaive <- 2:10 %>% purrr::map_df(knnforecasting) %>% summarise(MAE = min(MAE.Knn.Naive))
 
 
 # knnn regression for forecasting
