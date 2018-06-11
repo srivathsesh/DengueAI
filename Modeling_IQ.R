@@ -319,3 +319,11 @@ linearRetrain.iq <- lm(formula = total_cases ~ L(reanalysis_tdtr_k, 10) + L(tota
                                                                             1), data = data.frame(x.iq.train[156:442,],y.iq.boxcox[156:442]))
 
 linearRetrain.iq <- dyn(linearRetrain.iq)
+
+# Summary of models
+summaryMAE.iq <- data.frame(ModelCategory.iq = c("Linear MOdel", "Boosting", "ArimaXreg", "Knn" ),
+                            Description.iq = c("Stepwise selection", "Cross validation tuning", "ARIMA(1,0,1)", "k = 10"),
+                            MAES.iq = c(MAE.StepWise.iq,MAE.Bossting.iq,MAE.AutoArimaXreg,MAE.KNN.iq))
+
+
+

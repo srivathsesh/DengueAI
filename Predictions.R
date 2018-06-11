@@ -182,7 +182,7 @@ KnnNaiveFcts <- xts(InvBoxCox(knnNaivePred$prediction,lambda), order.by = time(y
 SJPredMatrix <- xts::cbind.xts(sj.linearFcts,sj.Arima2fcts,KnnNaiveFcts,knntestPredsActuals)
 Wts <- summaryMAE$MAES[c(4,6,7,8)]
 EnsemblePred <- EnsemblePrediction(SJPredMatrix, Wts)
-
+EnsemblePredxts <- xts(EnsemblePred, order.by = time(y.pred.sj[937:1196,]))
 
 #****************************************************************
 #                    Ensemble Predictions - IQ
@@ -198,7 +198,8 @@ ArimaPreffctActual <- InvBoxCox(ArimaPred.iq,lambda.iq)
 
 ArimaIQXregFct <- auto.arima(y.iq[157:442,], xreg = x.iq.train[157:442,colnames(x.iq.train) %in% varnames.iq],lambda = lambda.iq)
 ArimaIQXregFctActuals <- forecast(ArimaIQXregFct, h = 156, xreg = x.pred.iq[443:598,colnames(x.iq.train) %in% varnames.iq],lambda = lambda.iq )
-
+ArimaIQXregFctActuals <- xts(ArimaIQXregFctActuals$mean, order.by = time(y.pred.iq[443:598,]))
+colnames(ArimaIQXregFctActuals) <- "total_cases"
 
 laggedPredTest.iq <- generatedLaggedPredictors(cbind(x.pred.iq,y.pred.iq), c(
   suggestedLags.iq$predictor,
@@ -209,5 +210,16 @@ specificLags = T)
 
 knnpredtest.iq <- MakePredictions(laggedPredTest.iq,y.pred.iq,currentTime = 442,model = knnTune.iq,598)
 knnpredfctActual <- InvBoxCox(knnpredtest.iq, lambda.iq)
+
+IQPredMatrix <- xts::cbind.xts(linearPredFctActual.iq[443:598,],iq.boosting.pred,ArimaIQXregFctActuals,knnpredfctActual[443:598,])
+
+
+EnsemblePred.iq <- EnsemblePrediction(IQPredMatrix,summaryMAE.iq$MAES.iq)
+EnsemblePred.iqxts <- xts(EnsemblePred.iq, order.by = time(y.pred.iq[443:598,]))
+
+colnames(EnsemblePred.iqxts) <- "total_cases"
+colnames(EnsemblePredxts) <- "total_cases"
+
+Makefile(EnsemblePredxts,EnsemblePred.iqxts,'ensemblefct.csv')
 
 
