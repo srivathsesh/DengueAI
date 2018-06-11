@@ -192,4 +192,22 @@ EnsemblePred <- EnsemblePrediction(SJPredMatrix, Wts)
 linearPred.iq <- MakePredictions(x.pred.iq,y.pred.iq,currentTime = 442, model = linearRetrain.iq, until = 598)
 linearPredFctActual.iq <- InvBoxCox(linearPred.iq,lambda.iq)
 
+# Arima prediction
+ArimaPred.iq <- MakePredictions(x.pred.iq,y.pred.iq,currentTime = 442, model = autoarima.iq, until = 598, bypass = T)
+ArimaPreffctActual <- InvBoxCox(ArimaPred.iq,lambda.iq)
+
+ArimaIQXregFct <- auto.arima(y.iq[157:442,], xreg = x.iq.train[157:442,colnames(x.iq.train) %in% varnames.iq],lambda = lambda.iq)
+ArimaIQXregFctActuals <- forecast(ArimaIQXregFct, h = 156, xreg = x.pred.iq[443:598,colnames(x.iq.train) %in% varnames.iq],lambda = lambda.iq )
+
+
+laggedPredTest.iq <- generatedLaggedPredictors(cbind(x.pred.iq,y.pred.iq), c(
+  suggestedLags.iq$predictor,
+  
+  "total_cases"
+),c(suggestedLags.iq$lags,1),
+specificLags = T)
+
+knnpredtest.iq <- MakePredictions(laggedPredTest.iq,y.pred.iq,currentTime = 442,model = knnTune.iq,598)
+knnpredfctActual <- InvBoxCox(knnpredtest.iq, lambda.iq)
+
 

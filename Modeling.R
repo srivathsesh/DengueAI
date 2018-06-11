@@ -221,9 +221,9 @@ getnewdata <-  function(x,y,currentTime){
 #               One ahead forecast
 #----------------------------------------------------------------------------
 
-oneaheadForecast <- function (x,y,currentTime,model,...){
+oneaheadForecast <- function (x,y,currentTime,model,bypass = F){
   
-
+if(bypass == F){
   if(any(c('ARIMA','train') %in% class(model))){
     newdata <- getnewdata4Arima(x,y,currentTime)
   } else {
@@ -243,8 +243,12 @@ oneaheadForecast <- function (x,y,currentTime,model,...){
       prediction <- predict(model,newdata = newdata)
       return(prediction)
     }
-     
+    
   }
+} else {
+  newdata <- getnewdata(x,y,currentTime)
+  prediction <- forecast(model,h =1)
+}
   
   tail(prediction$mean,1)
 }
@@ -253,7 +257,7 @@ oneaheadForecast <- function (x,y,currentTime,model,...){
 #                         Make Predictions
 #-----------------------------------------------------------------------------
 
-MakePredictions <- function(x, y, currentTime, model, until) {
+MakePredictions <- function(x, y, currentTime, model, until,...) {
 
   # predictions <-window(y, start = '1990-04-30', end = currentTime)
   # predictions <- rbind.zoo(coredata(predictions), rep(NA,ceiling(difftime(strptime(until,"%Y-%m-%d"),strptime(currentTime + 1, "%Y-%m-%d"),units ='weeks'))))
@@ -264,7 +268,7 @@ MakePredictions <- function(x, y, currentTime, model, until) {
   y[future : nrow(y),] <- NA
 
   while (currentTime < until) {
-    oneaheadPred <- oneaheadForecast(x,y, currentTime, model)
+    oneaheadPred <- oneaheadForecast(x,y, currentTime, model,...)
     currentTime<- currentTime + 1
     y[currentTime,1] <- oneaheadPred
 
