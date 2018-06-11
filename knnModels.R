@@ -43,16 +43,19 @@ MAE.KnnNaive <- 2:10 %>% purrr::map_df(knnforecasting) %>% summarise(MAE = min(M
                              selectionFunction = "oneSE"
   )
   
+
   
 fctknnTuned <- predict(refitknn,newdata = data.frame(laggedPred2[624:936,]))
 
-fctknnTuned <- forecast::InvBoxCox(fctknnTuned,lambda)
+knnpreds <- MakePredictions(laggedPred2,y.boxcox,currentTime = 623,model = refitknn,936)
+
+fctknnTuned <- forecast::InvBoxCox(knnpreds,lambda)
 actuals <- forecast::InvBoxCox( y.boxcox[624:936,],lambda) 
 
 
-fctknnTunedHist <- predict(refitknn, newdata = data.frame(laggedPred2[80:467,]))
+fctknnTunedHist <- MakePredictions(laggedPred2,y.boxcox,currentTime = 79,model = refitknn,467)
 plot(y.boxcox[80:467,])
-lines(xts(fctknnTunedHist,order.by = time(y.boxcox[80:467,])),col = 'red')
+lines(xts(fctknnTunedHist$total_cases,order.by = time(y.boxcox)),col = 'red')
 
 actualHist <- y[80:467,]
 fctknnTunedHist.Actuals <- forecast::InvBoxCox(fctknnTunedHist,lambda)
