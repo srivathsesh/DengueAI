@@ -75,7 +75,7 @@ tsTestImputedIq <- xts(tsTestImputedIq,order.by = imputedtestIQ$week_start_date,
 
 
 #*******************************************************************
-#          5. Create Model matrices
+#                     5. Create Model matrices
 #*******************************************************************
 
 # Are xts and zoo classes not sure if there will be an issue
@@ -95,5 +95,73 @@ x.pred.iq <- xts::rbind.xts(x.iq.train,x.test.iq)
 
 y.pred.sj <- xts::rbind.xts(y.boxcox,y.boxcox.test.sj)
 y.pred.iq <- xts::rbind.xts(y.iq.boxcox,y.boxcox.test.iq)
+
+
+#******************************************************************************
+#                        7. Make submission file
+#******************************************************************************
+Makefile <- function(sjpreds,iqpreds,filename){
+  submissionfile <- read.csv('submission_format.csv', header = T)
+  # Make variables
+  city <- c(rep('sj',260),rep('iq',156))
+  year <- c(year(time(sjpreds)),year(time(iqpreds)))
+  #weekofyear <- c(isoweek(time(sjpreds)),isoweek(time(iqpreds)))
+  weekofyear <- submissionfile$weekofyear
+  total_cases <- c(round(sjpreds$total_cases),round(iqpreds$total_cases))
+  
+  # Make dataframe to write to file
+  df <- data.frame(city,year,weekofyear,total_cases)
+  write.csv(df,file = filename,row.names = F)
+}
+
+
+#*******************************************************************************
+#                       8. PREDICTIONS
+#*******************************************************************************
+
+# index 936 is the ending of training set , after which there should be NAs for response variable
+# Current time is set to be 936 & until 1196 for san juan
+# Current time is set to 442 & until 598 for iq
+
+# 1. Stepwise model - SJ
+
+sj.stepwise <- MakePredictions(x.pred.sj,y.pred.sj,currentTime = 936,model = selectionmdl,until = 1196 )
+sj.stepwise <- InvBoxCox(sj.stepwise$total_cases,lambda)
+sj.stepwise.pred <- sj.stepwise[937:1196,]
+
+
+# 2. Boosting model - IQ
+iq.boosting <- predict(gbmTune.iq, newdata = x.pred.iq[443:598,])
+iq.boosting.pred <- xts(iq.boosting,order.by = time(x.pred.iq[443:598,]))
+colnames(iq.boosting.pred) <- "total_cases"
+
+Makefile(sj.stepwise.pred,iq.boosting.pred,"stepwiseBoosting.csv")
+
+
+#3. Ensemble model
+
+laggedPredTestsj <- generatedLaggedPredictors(cbind(x.pred.sj,y.pred.sj), c(
+  #  'reanalysis_relative_humidity_percent',
+  #  'reanalysis_precip_amt_kg_per_m2',
+  'reanalysis_max_air_temp_k',
+  #  "ndvi_ne","ndvi_nw",
+  # "ndvi_se",
+  # "ndvi_sw",
+  # "reanalysis_sat_precip_amt_mm",
+  "reanalysis_tdtr_k",
+  "total_cases"
+),c(suggestedLags$lags[c(-1,-2,-4,-5,-6,-7,-8)],1),
+specificLags = T)
+
+# Arima predictions
+
+sj.Arima2 <- MakePredictions(laggedPredTestsj,y.pred.sj,currentTime = 936,model = AutoArimamdl2,until = 1196)
+
+# knn predictions
+
+knntestPreds <- MakePredictions(laggedPredTestsj,y.pred.sj,currentTime = 936,model = refitknn,1196)
+
+# naive knn predictions
+
 
 
