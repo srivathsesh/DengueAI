@@ -222,7 +222,8 @@ getnewdata <-  function(x,y,currentTime){
 #----------------------------------------------------------------------------
 
 oneaheadForecast <- function (x,y,currentTime,model,...){
-  if('ARIMA' %in% class(model)){
+
+  if(any(c('ARIMA','train') %in% class(model))){
     newdata <- getnewdata4Arima(x,y,currentTime)
   } else {
     newdata <- getnewdata(x,y,currentTime)
@@ -234,10 +235,14 @@ oneaheadForecast <- function (x,y,currentTime,model,...){
   if('dyn' %in% class(model)){
     prediction <- predict(model,newdata)
   } else{
-    if('ARIMA' %in% class(model))
-      #browser()
+    if('ARIMA' %in% class(model)){
       prediction <- predict(model,n.step = 1, newxreg = newdata)
       return(tail(prediction$pred,1))
+    } else{
+      prediction <- predict(model,newdata = newdata)
+      return(prediction)
+    }
+     
   }
   
   tail(prediction$mean,1)
@@ -255,17 +260,12 @@ MakePredictions <- function(x, y, currentTime, model, until) {
   #startindex = which(index(y)==currentTime) + 1
   future = currentTime + 1
   y[future : nrow(y),] <- NA
-<<<<<<< Updated upstream
+
   while (currentTime < until) {
     oneaheadPred <- oneaheadForecast(x,y, currentTime, model)
     currentTime<- currentTime + 1
     y[currentTime,1] <- oneaheadPred
-=======
-  while (future <= until) {
-    oneaheadPred <- oneaheadForecast(x,y, future, model)
-    future <- currentTime + 1
-    y[future,1] <- oneaheadPred
->>>>>>> Stashed changes
+
     
   }
   return(y)
@@ -552,10 +552,13 @@ MAE.Arima2 <- mean(abs(ArimaFct2Actuals[624:936] - y[624:936,]))
 
 plot(knnTune, main = "Choice of K for KNN" )
 
-fctknnTuned <- predict(refitknn,newdata = data.frame(laggedPred2[624:936,]))
+fctknnTuned <- MakePredictions(laggedPred2,y.boxcox,currentTime = 623,model = refitknn,936)
+
+
+
 
 plot(y.boxcox[623:936,1],grid.ticks.on = F, main = "BoxCox Transformed total cases forecast by KNN on hold out set")
-lines(xts(fctknnTuned,order.by = time(y.boxcox[624:936,1])),col = 'red')
+lines(xts(fctknnTuned$total_cases,order.by = time(y.boxcox[1:936,1]))[623:936],col = 'red')
 addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','KNN forecast'),col = c('black','red'),lty = 1)
 
 fctknnTuned.Actuals <- forecast::InvBoxCox(fctknnTuned,lambda)

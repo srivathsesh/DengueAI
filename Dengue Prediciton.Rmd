@@ -212,7 +212,7 @@ auto.arima(trainImputedSj$total_cases[trainImputedSj$year >= 1996],stepwise = F)
 ```
 
 ```{r}
-rfRFE_timeEffect <- rfe(x = trainImputedSj[,c(-1:-3,-19)],
+rfRFE_timeEffect <- rfe(x = trainImputedSj[trainImputedSj$year >= 1996,c(-1:-3,-19)],
              y = fit$fit$residuals,
              sizes = varSeq,
              metric = "RMSE",
@@ -238,7 +238,7 @@ topPredL_presentTime %<>% arrange(desc(Coefs)) %>% filter(!Predictors == "(Inter
  
 ```{r}
 Box.test(fit$fit$residuals)
-cv.out <- glmnet::cv.glmnet(x = model.matrix(total_cases ~ ., trainImputedSj[,c(-1:-3)])[,-1],y = as.numeric(fit$fit$residuals), alpha = 1)
+cv.out <- glmnet::cv.glmnet(x = model.matrix(total_cases ~ ., trainImputedSj[trainImputedSj$year >= 1996,c(-1:-3)])[,-1],y = as.numeric(fit$fit$residuals), alpha = 1)
 out <- glmnet::glmnet(x,trainImputedSj$total_cases,lambda = cv.out$lambda.min, alpha = 1)
 topPredLasso <- abs(predict(out,type = "coefficients",s=cv.out$lambda.min))
 topPredLasso
