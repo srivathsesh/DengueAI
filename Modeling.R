@@ -222,6 +222,7 @@ getnewdata <-  function(x,y,currentTime){
 #----------------------------------------------------------------------------
 
 oneaheadForecast <- function (x,y,currentTime,model,...){
+  
 
   if(any(c('ARIMA','train') %in% class(model))){
     newdata <- getnewdata4Arima(x,y,currentTime)
@@ -258,6 +259,7 @@ MakePredictions <- function(x, y, currentTime, model, until) {
   # predictions <- rbind.zoo(coredata(predictions), rep(NA,ceiling(difftime(strptime(until,"%Y-%m-%d"),strptime(currentTime + 1, "%Y-%m-%d"),units ='weeks'))))
   #predictions <- zoo(predictions,order.by = time(window(x,start = '1990-04-30', end = until)))
   #startindex = which(index(y)==currentTime) + 1
+  #browser()
   future = currentTime + 1
   y[future : nrow(y),] <- NA
 
@@ -518,6 +520,7 @@ stepwiseActuals <- InvBoxCox(selectionmdlfct,lambda)
 MAE.StepWise <- mean(abs(stepwiseActuals[624:936] - y[624:936,]))
 
 
+
 #************************************************************************
 #              Arima model performance
 #************************************************************************
@@ -562,7 +565,7 @@ lines(xts(fctknnTuned$total_cases,order.by = time(y.boxcox[1:936,1]))[623:936],c
 addLegend(legend.loc = "topleft", legend.names = c('BoxCox Total_Cases','KNN forecast'),col = c('black','red'),lty = 1)
 
 fctknnTuned.Actuals <- forecast::InvBoxCox(fctknnTuned,lambda)
-MAE.KNN <- mean(abs(fctknnTuned.Actuals - y[624:936,]))
+MAE.KNN <- mean(abs(fctknnTuned.Actuals[624:936,] - y[624:936,]))
 
 
 # Summary sofar
@@ -574,4 +577,14 @@ MAES <- c(MAE.mdl1[[1]],MAE.mdl2[[1]],MAE.mdl3[[1]],MAE.StepWise[[1]], MAE.Arima
 
 summaryMAE <- data.frame(ModelCategory ,Modelnames,
                          Description,MAES)
+
+#------------------------------------------------------------------
+# retrain in the last window of data
+#-----------------------------------------------------------------
+
+# linear model retrain 
+finalmdl <- lm(formula = total_cases ~ L(reanalysis_max_air_temp_k, 8) + 
+                 L(reanalysis_tdtr_k, 2) + L(total_cases, 1), data = data.frame(cbind(ModelResults$x[[5]], 
+                                                                                      ModelResults$y[[5]])))
+finalmdl <- dyn(finalmdl)
 

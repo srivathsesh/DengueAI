@@ -137,8 +137,9 @@ colnames(iq.boosting.pred) <- "total_cases"
 
 Makefile(sj.stepwise.pred,iq.boosting.pred,"stepwiseBoosting.csv")
 
-
-#3. Ensemble model
+#****************************************************************
+#                    Ensemble Predictions - SJ
+#*****************************************************************
 
 laggedPredTestsj <- generatedLaggedPredictors(cbind(x.pred.sj,y.pred.sj), c(
   #  'reanalysis_relative_humidity_percent',
@@ -156,12 +157,39 @@ specificLags = T)
 # Arima predictions
 
 sj.Arima2 <- MakePredictions(laggedPredTestsj,y.pred.sj,currentTime = 936,model = AutoArimamdl2,until = 1196)
+sj.Arima2fcts <- InvBoxCox(sj.Arima2,lambda)
+sj.Arima2fcts <- sj.Arima2fcts[937:1196]
 
 # knn predictions
 
 knntestPreds <- MakePredictions(laggedPredTestsj,y.pred.sj,currentTime = 936,model = refitknn,1196)
+knntestPredsActuals <- InvBoxCox(knntestPreds,lambda)
+knntestPredsActuals <- knntestPreds[937:1196]
+# Linear regression retrained model
+
+sj.linear <- MakePredictions(x.pred.sj,y.pred.sj, currentTime = 936, model = finalmdl, until = 1196)
+sj.linear <- InvBoxCox(sj.linear,lambda)
+sj.linearFcts <- sj.linear[937:1196]
 
 # naive knn predictions
 
+# retain Naive Knn
+knnNaivePred <- knn_forecasting(timeS = ts(y.pred.sj[625:936]),h = 260, k = 2, msas = 'recursive', lags = 1:6 )
+KnnNaiveFcts <- xts(InvBoxCox(knnNaivePred$prediction,lambda), order.by = time(y.pred.sj[937:1196,]))
+
+
+
+SJPredMatrix <- xts::cbind.xts(sj.linearFcts,sj.Arima2fcts,KnnNaiveFcts,knntestPredsActuals)
+Wts <- summaryMAE$MAES[c(4,6,7,8)]
+EnsemblePred <- EnsemblePrediction(SJPredMatrix, Wts)
+
+
+#****************************************************************
+#                    Ensemble Predictions - IQ
+#*****************************************************************
+
+# retrained Linear model predictions
+linearPred.iq <- MakePredictions(x.pred.iq,y.pred.iq,currentTime = 442, model = linearRetrain.iq, until = 598)
+linearPredFctActual.iq <- InvBoxCox(linearPred.iq,lambda.iq)
 
 

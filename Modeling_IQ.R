@@ -314,3 +314,8 @@ EnsemblePrediction <- function(forecasts,MAES){
 }
 
 
+# Retrain Linear model
+linearRetrain.iq <- lm(formula = total_cases ~ L(reanalysis_tdtr_k, 10) + L(total_cases, 
+                                                                            1), data = data.frame(x.iq.train[156:442,],y.iq.boxcox[156:442]))
+
+linearRetrain.iq <- dyn(linearRetrain.iq)
